@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🎵 음표 입력 악보 제작기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px;
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  /* Header */
+  #header { margin-bottom: 18px; text-align: center; }
+  #header .emoji { font-size: 36px; margin-bottom: 2px; }
+  #header h1 { color: #fff; font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+  #header p  { color: #90caf9; font-size: 13px; margin-top: 4px; }
+
+  /* Note buttons */
+  .note-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; justify-content: center; }
+  .note-btn {
+    width: 64px; height: 64px;
+    border-radius: 16px; border: none;
+    color: #fff; font-weight: 800; font-size: 18px;
+    cursor: pointer; transition: transform 0.1s;
+  }
+  .note-btn:active { transform: scale(0.93); }
+  .note-btn.small { font-size: 13px; }
+
+  /* Sheet scroll container */
+  #scroll-wrap {
+    width: 100%; max-width: 700px;
+    margin: 16px 0 4px;
+    background: #fffef5;
+    border-radius: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    scrollbar-width: thin;
+    scrollbar-color: #90caf9 #0d1b2a;
+  }
+  #scroll-wrap::-webkit-scrollbar { height: 6px; }
+  #scroll-wrap::-webkit-scrollbar-track { background: #0d1b2a; border-radius: 3px; }
+  #scroll-wrap::-webkit-scrollbar-thumb { background: #90caf9; border-radius: 3px; }
+
+  #sheet { display: block; height: 220px; }
+
+  /* Hint & count */
+  #scroll-hint { color: #90caf9aa; font-size: 11px; margin: 2px 0 6px; text-align: center; display: none; }
+  #note-count  { color: #90caf9; font-size: 13px; margin-bottom: 10px; }
+
+  /* Control buttons */
+  #controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
+  .ctrl-btn {
+    padding: 10px 18px; border-radius: 12px; border: none;
+    color: #fff; font-weight: 700; font-size: 14px;
+    cursor: pointer; transition: transform 0.1s;
+  }
+  .ctrl-btn:disabled { background: #333 !important; color: #666; cursor: not-allowed; box-shadow: none !important; }
+  .ctrl-btn:not(:disabled):active { transform: scale(0.95); }
+
+  /* Save area */
+  #save-area { width: 100%; max-width: 700px; }
+  #save-area p { color: #90caf9; font-size: 12px; margin-bottom: 4px; }
+  #songData {
+    width: 100%; height: 70px; padding: 10px;
+    border-radius: 10px; border: 1px solid #333;
+    background: #0d1b2a; color: #90caf9;
+    font-size: 13px; resize: vertical; font-family: monospace;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: #1e88e5; color: #fff; padding: 10px 22px;
+    border-radius: 24px; font-weight: 700; font-size: 14px;
+    box-shadow: 0 4px 20px rgba(30,136,229,0.5); z-index: 9999;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="emoji">🎵</div>
+  <h1>음표 입력 악보 제작기</h1>
+  <p>음표를 눌러 악보를 만들고 재생해보세요</p>
+</div>
+
+<div class="note-row" id="row1"></div>
+<div class="note-row" id="row2"></div>
+
+<div id="scroll-wrap">
+  <canvas id="sheet" height="220"></canvas>
+</div>
+<p id="scroll-hint">← 좌우로 스크롤하면 모든 음표를 볼 수 있어요 →</p>
+<div id="note-count">음표 0개</div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="btn-play"   style="background:#43a047;box-shadow:0 3px 12px #43a04766" disabled>▶ 재생</button>
+  <button class="ctrl-btn" id="btn-back"   style="background:#fb8c00;box-shadow:0 3px 12px #fb8c0066" disabled>⌫ 되돌리기</button>
+  <button class="ctrl-btn" id="btn-clear"  style="background:#e53935;box-shadow:0 3px 12px #e5393566" disabled>🗑 전체 삭제</button>
+  <button class="ctrl-btn" id="btn-save"   style="background:#1e88e5;box-shadow:0 3px 12px #1e88e566" disabled>💾 저장</button>
+  <button class="ctrl-btn" id="btn-load"   style="background:#8e24aa;box-shadow:0 3px 12px #8e24aa66" disabled>📂 불러오기</button>
+</div>
+
+<div id="save-area">
+  <p>저장 데이터 (붙여넣기로 불러오기 가능)</p>
+  <textarea id="songData" placeholder="저장 버튼을 누르거나 직접 데이터를 붙여넣으세요"></textarea>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── 상수 ──────────────────────────────────────────────
+const NOTE_NAMES = ["도","레","미","파","솔","라","시","높은도"];
+const FREQ = { 도:261.63, 레:293.66, 미:329.63, 파:349.23, 솔:392.0, 라:440.0, 시:493.88, 높은도:523.25 };
+const NOTE_COLORS = { 도:"#e53935", 레:"#fb8c00", 미:"#fdd835", 파:"#43a047", 솔:"#1e88e5", 라:"#8e24aa", 시:"#00acc1", 높은도:"#e53935" };
+
+const STAFF_TOP   = 60;
+const LINE_GAP    = 18;
+const CLEF_W      = 56;
+const NOTE_START_X = CLEF_W + 12;
+const NOTE_SPACING = 48;
+const CANVAS_H    = 220;
+
+const STAFF_LINES = [0,1,2,3,4].map(i => STAFF_TOP + i * LINE_GAP);
+const NOTE_Y = {
+  도:     STAFF_TOP + LINE_GAP * 5,
+  레:     STAFF_TOP + LINE_GAP * 4 + LINE_GAP / 2,
+  미:     STAFF_TOP + LINE_GAP * 4,
+  파:     STAFF_TOP + LINE_GAP * 3 + LINE_GAP / 2,
+  솔:     STAFF_TOP + LINE_GAP * 3,
+  라:     STAFF_TOP + LINE_GAP * 2 + LINE_GAP / 2,
+  시:     STAFF_TOP + LINE_GAP * 2,
+  높은도: STAFF_TOP + LINE_GAP * 1 + LINE_GAP / 2,
+};
+
+// ── 상태 ──────────────────────────────────────────────
+let notes = [];
+let playing = false;
+let activeIndex = -1;
+let audioCtx = null;
+
+// ── DOM ───────────────────────────────────────────────
+const canvas    = document.getElementById("sheet");
+const ctx       = canvas.getContext("2d");
+const scrollWrap= document.getElementById("scroll-wrap");
+const countEl   = document.getElementById("note-count");
+const hintEl    = document.getElementById("scroll-hint");
+const toastEl   = document.getElementById("toast");
+const songDataEl= document.getElementById("songData");
+
+// ── 음표 버튼 생성 ─────────────────────────────────────
+const NOTE_ROWS = [
+  ["도","레","미","파"],
+  ["솔","라","시","높은도"],
+];
+NOTE_ROWS.forEach((row, ri) => {
+  const rowEl = document.getElementById("row" + (ri+1));
+  row.forEach(note => {
+    const btn = document.createElement("button");
+    btn.className = "note-btn" + (note === "높은도" ? " small" : "");
+    btn.textContent = note === "높은도" ? "↑도" : note;
+    btn.style.background = NOTE_COLORS[note];
+    btn.style.boxShadow  = `0 4px 16px ${NOTE_COLORS[note]}66`;
+    btn.addEventListener("click", () => addNote(note));
+    rowEl.appendChild(btn);
+  });
+});
+
+// ── 컨트롤 버튼 ───────────────────────────────────────
+document.getElementById("btn-play") .addEventListener("click", playSong);
+document.getElementById("btn-back") .addEventListener("click", removeLastNote);
+document.getElementById("btn-clear").addEventListener("click", clearNotes);
+document.getElementById("btn-save") .addEventListener("click", saveSong);
+document.getElementById("btn-load") .addEventListener("click", loadSong);
+songDataEl.addEventListener("input", updateButtons);
+
+// ── 캔버스 크기 ───────────────────────────────────────
+function getCanvasW() {
+  const needed = NOTE_START_X + notes.length * NOTE_SPACING + 40;
+  return Math.max(scrollWrap.offsetWidth || 400, needed);
+}
+
+function syncCanvasSize() {
+  const w = getCanvasW();
+  if (canvas.width !== w) canvas.width = w;
+}
+
+window.addEventListener("resize", () => { syncCanvasSize(); drawSheet(); });
+
+// ── 그리기 ────────────────────────────────────────────
+function drawSheet() {
+  syncCanvasSize();
+  const W = canvas.width;
+
+  ctx.clearRect(0, 0, W, CANVAS_H);
+
+  // 배경
+  ctx.fillStyle = "#fffef5";
+  ctx.fillRect(0, 0, W, CANVAS_H);
+
+  // 높은음자리표
+  ctx.font = "bold 90px serif";
+  ctx.fillStyle = "#333";
+  ctx.fillText("𝄞", 6, STAFF_TOP + LINE_GAP * 4 + 14);
+
+  // 오선
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 1.2;
+  STAFF_LINES.forEach(y => {
+    ctx.beginPath();
+    ctx.moveTo(CLEF_W, y);
+    ctx.lineTo(W - 12, y);
+    ctx.stroke();
+  });
+
+  // 도 보조선
+  ctx.strokeStyle = "#aaa";
+  ctx.lineWidth = 1.5;
+  notes.forEach((n, i) => {
+    if (n === "도") {
+      const x = NOTE_START_X + i * NOTE_SPACING;
+      ctx.beginPath();
+      ctx.moveTo(x - 14, NOTE_Y["도"]);
+      ctx.lineTo(x + 14, NOTE_Y["도"]);
+      ctx.stroke();
+    }
+  });
+
+  // 음표
+  notes.forEach((note, i) => {
+    const x = NOTE_START_X + i * NOTE_SPACING;
+    const y = NOTE_Y[note];
+    const isActive = i === activeIndex;
+    const color = NOTE_COLORS[note];
+
+    // 줄기
+    ctx.strokeStyle = isActive ? "#fff" : color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 9, y);
+    ctx.lineTo(x + 9, y - 38);
+    ctx.stroke();
+
+    // 글로우
+    ctx.shadowColor = isActive ? color : "transparent";
+    ctx.shadowBlur  = isActive ? 18 : 0;
+
+    // 머리
+    ctx.beginPath();
+    ctx.ellipse(x, y, 10, 7.5, -0.2, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? "#fff" : color;
+    ctx.fill();
+    ctx.strokeStyle = isActive ? color : "rgba(0,0,0,0.2)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // 이름 라벨
+    ctx.font = "bold 11px 'Segoe UI', sans-serif";
+    ctx.fillStyle = isActive ? color : "#666";
+    ctx.textAlign = "center";
+    ctx.fillText(note === "높은도" ? "↑도" : note, x, STAFF_TOP + LINE_GAP * 5 + 24);
+  });
+
+  ctx.textAlign = "left";
+}
+
+// ── UI 업데이트 ───────────────────────────────────────
+function updateUI() {
+  countEl.textContent = `음표 ${notes.length}개`;
+  hintEl.style.display = notes.length > 8 ? "block" : "none";
+  updateButtons();
+  drawSheet();
+}
+
+function updateButtons() {
+  const hasNotes = notes.length > 0;
+  const hasSaved = songDataEl.value.trim() !== "";
+  document.getElementById("btn-play") .disabled = !hasNotes || playing;
+  document.getElementById("btn-back") .disabled = !hasNotes;
+  document.getElementById("btn-clear").disabled = !hasNotes;
+  document.getElementById("btn-save") .disabled = !hasNotes;
+  document.getElementById("btn-load") .disabled = !hasSaved;
+}
+
+// ── 토스트 ────────────────────────────────────────────
+let toastTimer;
+function notify(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200);
+}
+
+// ── 음표 추가/삭제 ────────────────────────────────────
+function addNote(note) {
+  notes.push(note);
+  updateUI();
+  // 끝으로 자동 스크롤
+  setTimeout(() => { scrollWrap.scrollLeft = scrollWrap.scrollWidth; }, 30);
+}
+
+function removeLastNote() {
+  if (notes.length === 0) return;
+  notes.pop();
+  updateUI();
+}
+
+function clearNotes() {
+  notes = [];
+  activeIndex = -1;
+  updateUI();
+}
+
+// ── 오디오 ────────────────────────────────────────────
+function getAudio() {
+  if (!audioCtx || audioCtx.state === "closed")
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq) {
+  const ac   = getAudio();
+  const osc  = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.frequency.value = freq;
+  osc.type = "sine";
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  gain.gain.setValueAtTime(0.3, ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.5);
+  osc.start();
+  osc.stop(ac.currentTime + 0.5);
+}
+
+function scrollToNote(i) {
+  const noteX = NOTE_START_X + i * NOTE_SPACING;
+  scrollWrap.scrollTo({ left: Math.max(0, noteX - scrollWrap.offsetWidth / 2), behavior: "smooth" });
+}
+
+async function playSong() {
+  if (playing || notes.length === 0) return;
+  playing = true;
+  updateButtons();
+  for (let i = 0; i < notes.length; i++) {
+    activeIndex = i;
+    scrollToNote(i);
+    drawSheet();
+    playTone(FREQ[notes[i]]);
+    await new Promise(r => setTimeout(r, 520));
+  }
+  activeIndex = -1;
+  playing = false;
+  drawSheet();
+  updateButtons();
+}
+
+// ── 저장 / 불러오기 ───────────────────────────────────
+function saveSong() {
+  songDataEl.value = JSON.stringify(notes);
+  notify("악보가 저장되었어요 💾");
+  updateButtons();
+}
+
+function loadSong() {
+  try {
+    const data = JSON.parse(songDataEl.value);
+    if (!Array.isArray(data) || !data.every(n => NOTE_NAMES.includes(n))) throw new Error();
+    notes = data;
+    activeIndex = -1;
+    updateUI();
+    notify("악보를 불러왔어요 📂");
+  } catch {
+    notify("불러오기 실패 — 올바른 데이터를 붙여넣으세요");
+  }
+}
+
+// ── 초기화 ────────────────────────────────────────────
+syncCanvasSize();
+drawSheet();
+updateButtons();
+</script>
+</body>
+</html>
